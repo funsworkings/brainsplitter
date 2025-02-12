@@ -1,9 +1,108 @@
+using System;
+using System.Collections;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Framework
 {
-    public class SceneLoader : MonoBehaviour
+    public class SceneLoader : MonoBehaviour, IManager
     {
+        #region Internal
+
+        [Serializable]
+        public struct SceneObject
+        {
+            public string sceneTitle;
+            public string sceneId;
+        }
         
+        #endregion
+
+        [SerializeField] private SceneObject[] scenes;
+
+        private int _activeSceneIndex = -1;
+        private int sceneCount;
+
+        private void Start()
+        {
+            GameManager.Instance.Add(this);
+        }
+
+        private void Update()
+        {
+            if (Input.GetKeyUp(KeyCode.RightArrow))
+            {
+                Debug.LogWarning("fuck");
+                StartCoroutine(GoToNext());
+            }
+        }
+
+        private void OnDestroy()
+        {
+            GameManager.Instance.Remove<SceneLoader>();
+        }
+
+        public IEnumerator Initialize()
+        {
+            sceneCount = scenes.Length;
+            
+            yield break;
+        }
+        
+        public void Dispose(){}
+
+        private bool load = false;
+
+        IEnumerator GoTo(SceneObject sceneObject) => GoTo(sceneObject.sceneId);
+        IEnumerator GoTo(string sceneId)
+        {
+            if (load) yield break;
+
+            load = true;
+            yield return GoToScene(sceneId);
+        }
+
+        // Loads scenes asynchronously
+        IEnumerator GoToScene(string sceneId)
+        {
+            var loadOp = SceneManager.LoadSceneAsync(sceneId, LoadSceneMode.Additive);
+            while (!loadOp.isDone) yield return null;
+
+            var unloadOp = SceneManager.UnloadSceneAsync(SceneManager.GetActiveScene());
+            while (!unloadOp.isDone) yield return null;
+
+            _activeSceneIndex = GetActiveSceneIndex();
+            load = false;
+        }
+
+        int GetActiveSceneIndex()
+        {
+            var sc = SceneManager.GetActiveScene().name;
+
+            int index = 0;
+            foreach (var s in scenes)
+            {
+                if (string.Equals(s.sceneId, sc)) return index;
+                ++index;
+            }
+
+            return -1;
+        }
+        
+        #region Ops
+
+        public IEnumerator GoToStart() => GoTo(scenes[0]);
+
+        public IEnumerator GoToNext()
+        {
+            var tSceneIndex = _activeSceneIndex + 1;
+            if (tSceneIndex >= sceneCount) tSceneIndex = 0;
+            
+            Debug.LogWarning($"Try go to: {scenes[tSceneIndex].sceneId}");
+            yield return GoTo(scenes[tSceneIndex]);
+        }
+
+        #endregion
     }
 }
