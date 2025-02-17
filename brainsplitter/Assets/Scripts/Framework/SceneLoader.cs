@@ -21,8 +21,15 @@ namespace Framework
 
         [SerializeField] private SceneObject[] scenes;
 
+        private TransitionManager _transitionManager;
+
         private int _activeSceneIndex = -1;
         private int sceneCount;
+        
+        // Scene properties
+
+        public SceneController SceneController { get; private set; } = null;
+            public Camera SceneCamera => SceneController?.PrimaryCamera;
 
         private void Start()
         {
@@ -46,6 +53,10 @@ namespace Framework
         public IEnumerator Initialize()
         {
             sceneCount = scenes.Length;
+
+            _transitionManager = GameManager.Instance.Get<TransitionManager>();
+            
+            onActiveSceneUpdated();
             
             yield break;
         }
@@ -66,13 +77,19 @@ namespace Framework
         // Loads scenes asynchronously
         IEnumerator GoToScene(string sceneId)
         {
+            bool waitCacheState = true;
+            _transitionManager.CacheSceneState(() => waitCacheState = false);
+            while (waitCacheState) yield return null;
+            
             var loadOp = SceneManager.LoadSceneAsync(sceneId, LoadSceneMode.Additive);
             while (!loadOp.isDone) yield return null;
+            
+            _transitionManager.Transition();
 
             var unloadOp = SceneManager.UnloadSceneAsync(SceneManager.GetActiveScene());
             while (!unloadOp.isDone) yield return null;
-
-            _activeSceneIndex = GetActiveSceneIndex();
+            
+            onActiveSceneUpdated();
             load = false;
         }
 
@@ -103,6 +120,37 @@ namespace Framework
             yield return GoTo(scenes[tSceneIndex]);
         }
 
+        #endregion
+        
+        #region Helpers
+
+        SceneController ScrapeSceneController(Scene sc)
+        {
+            var rootGameObjects = sc.GetRootGameObjects();
+            foreach (var o in rootGameObjects)
+            {
+                var sceneController = o.GetComponentInChildren<SceneController>();
+                if (sceneController != null) return sceneController;
+            }
+            
+            return null;
+        }
+        
+        #endregion
+        
+        #region Callbacks
+
+        void onActiveSceneUpdated()
+        {
+            _activeSceneIndex = GetActiveSceneIndex();
+            onSceneUpdated(SceneManager.GetActiveScene());  
+        } 
+
+        void onSceneUpdated(Scene scene)
+        {
+            SceneController = ScrapeSceneController(scene);
+        }
+        
         #endregion
     }
 }

@@ -6,6 +6,9 @@ using UnityEngine;
 
 namespace Framework
 {
+    /// <summary>
+    /// Controls all of the core gameplay loops and scene triggers
+    /// </summary>
     public class GameManager : MonoBehaviour
     {
         public static GameManager Instance = null;
@@ -32,6 +35,7 @@ namespace Framework
             {
                 yield return manager.Initialize(); // Load manager class
             }
+            yield return null; // Wait one frame
 
             yield return Get<SceneLoader>().GoToStart(); // Load into right scene
         }
